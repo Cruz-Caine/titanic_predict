@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Titanic Survival Predictor</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #8B4513 0%, #A0522D 50%, #D2691E 100%);
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(139, 69, 19, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(160, 82, 45, 0.3) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(245, 222, 179, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(101, 67, 33, 0.3);
+            overflow: hidden;
+            border: 3px solid #8B4513;
+        }
+
+        .header {
+            background: linear-gradient(45deg, #654321, #8B4513, #A0522D);
+            color: #F5DEB3;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header::before {
+            content: '⚓ ⚓ ⚓';
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.2em;
+            opacity: 0.7;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-top: 15px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+            font-style: italic;
+        }
+
+        .form-container {
+            padding: 40px;
+            background: rgba(245, 222, 179, 0.8);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #654321;
+            font-size: 1.1em;
+            text-shadow: 1px 1px 2px rgba(245, 222, 179, 0.5);
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 12px 16px;
+            border: 2px solid #8B4513;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: rgba(255, 248, 220, 0.9);
+            color: #654321;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #D2691E;
+            box-shadow: 0 0 0 3px rgba(210, 105, 30, 0.2);
+            background: #FFF8DC;
+        }
+
+        .predict-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(45deg, #8B4513, #A0522D, #CD853F);
+            color: #F5DEB3;
+            border: 2px solid #654321;
+            border-radius: 12px;
+            font-size: 1.2em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .predict-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(139, 69, 19, 0.4);
+            background: linear-gradient(45deg, #A0522D, #CD853F, #DAA520);
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 1.3em;
+            font-weight: 600;
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .result.survived {
+            background: linear-gradient(45deg, #228B22, #32CD32, #DAA520);
+            color: #F5DEB3;
+            border: 2px solid #8B4513;
+        }
+
+        .result.not-survived {
+            background: linear-gradient(45deg, #8B0000, #CD5C5C, #A0522D);
+            color: #F5DEB3;
+            border: 2px solid #654321;
+        }
+
+        .probability {
+            font-size: 0.9em;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .history-section {
+            background: linear-gradient(45deg, #DEB887, #D2B48C);
+            padding: 30px;
+            margin-top: 20px;
+            border-top: 3px solid #8B4513;
+            border-bottom: 3px solid #8B4513;
+        }
+
+        .history-section h3 {
+            color: #654321;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 1px 1px 2px rgba(245, 222, 179, 0.5);
+            font-size: 1.4em;
+        }
+
+        .history-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .history-btn, .clear-btn {
+            padding: 10px 20px;
+            border: 2px solid #8B4513;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .history-btn {
+            background: linear-gradient(45deg, #CD853F, #DAA520);
+            color: #654321;
+        }
+
+        .history-btn:hover {
+            background: linear-gradient(45deg, #DAA520, #FFD700);
+            transform: translateY(-2px);
+        }
+
+        .clear-btn {
+            background: linear-gradient(45deg, #8B0000, #CD5C5C);
+            color: #F5DEB3;
+        }
+
+        .clear-btn:hover {
+            background: linear-gradient(45deg, #CD5C5C, #DC143C);
+            transform: translateY(-2px);
+        }
+
+        .history-display {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 2px solid #8B4513;
+            border-radius: 12px;
+            background: rgba(255, 248, 220, 0.9);
+            padding: 15px;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: rgba(245, 222, 179, 0.8);
+            border-radius: 8px;
+            border-left: 4px solid #8B4513;
+            transition: all 0.3s ease;
+        }
+
+        .history-item:hover {
+            background: rgba(245, 222, 179, 1);
+            transform: translateX(5px);
+        }
+
+        .history-item.survived {
+            border-left-color: #228B22;
+        }
+
+        .history-item.not-survived {
+            border-left-color: #8B0000;
+        }
+
+        .history-name {
+            font-weight: bold;
+            color: #654321;
+            font-size: 1.1em;
+        }
+
+        .history-details {
+            font-size: 0.9em;
+            color: #8B4513;
+            opacity: 0.8;
+        }
+
+        .history-result {
+            text-align: right;
+            font-weight: bold;
+        }
+
+        .history-result.survived {
+            color: #228B22;
+        }
+
+        .history-result.not-survived {
+            color: #8B0000;
+        }
+
+        .history-empty {
+            text-align: center;
+            color: #8B4513;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        .history-header {
+            text-align: center;
+            font-weight: bold;
+            color: #654321;
+            background: linear-gradient(45deg, #DAA520, #FFD700);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 2px solid #8B4513;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .loading {
+            text-align: center;
+            color: #8B4513;
+            font-style: italic;
+            padding: 20px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        .info-section {
+            background: linear-gradient(45deg, #D2B48C, #DEB887);
+            padding: 30px;
+            margin-top: 20px;
+            border-top: 3px solid #8B4513;
+            position: relative;
+        }
+
+        .info-section::before {
+            content: '🏴‍☠️ ⚔️ 🗡️ ⚔️ 🏴‍☠️';
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1em;
+            opacity: 0.7;
+        }
+
+        .info-section h3 {
+            color: #654321;
+            margin-bottom: 15px;
+            margin-top: 15px;
+            text-shadow: 1px 1px 2px rgba(245, 222, 179, 0.5);
+        }
+
+        .info-section p {
+            color: #8B4513;
+            line-height: 1.6;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏴‍☠️ Titanic Survival Predictor ⚓</h1>
+            <p>Discover yer fate aboard the ill-fated vessel using the ancient art of machine learning, ye scurvy dog!</p>
+        </div>
+        
+        <div class="form-container">
+            <form id="predictionForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="name">Passenger Name:</label>
+                        <input type="text" id="name" placeholder="Enter yer name, matey" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="pclass">Passenger Class:</label>
+                        <select id="pclass" required>
+                            <option value="">Select Class</option>
+                            <option value="1">1st Class</option>
+                            <option value="2">2nd Class</option>
+                            <option value="3">3rd Class</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="sex">Gender:</label>
+                        <select id="sex" required>
+                            <option value="">Select Gender</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="age">Age:</label>
+                        <input type="number" id="age" min="0" max="100" step="1" placeholder="Enter age" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="sibsp">Siblings/Spouses Aboard:</label>
+                        <input type="number" id="sibsp" min="0" max="10" step="1" placeholder="Number of siblings/spouses" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="parch">Parents/Children Aboard:</label>
+                        <input type="number" id="parch" min="0" max="10" step="1" placeholder="Number of parents/children" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="fare">Fare Paid:</label>
+                        <input type="number" id="fare" min="0" step="0.01" placeholder="Ticket fare in pounds" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="embarked">Port of Embarkation:</label>
+                        <select id="embarked" required>
+                            <option value="">Select Port</option>
+                            <option value="C">Cherbourg</option>
+                            <option value="Q">Queenstown</option>
+                            <option value="S">Southampton</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="deck">Deck (if known):</label>
+                        <select id="deck">
+                            <option value="">Unknown Deck</option>
+                            <option value="A">Deck A</option>
+                            <option value="B">Deck B</option>
+                            <option value="C">Deck C</option>
+                            <option value="D">Deck D</option>
+                            <option value="E">Deck E</option>
+                            <option value="F">Deck F</option>
+                            <option value="G">Deck G</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button type="submit" class="predict-btn">Predict Survival</button>
+            </form>
+            
+            <div id="result" class="result">
+                <div id="prediction-text"></div>
+                <div id="probability-text" class="probability"></div>
+            </div>
+            
+            <div class="history-section">
+                <h3>⚓ Global Passenger Registry ⚓</h3>
+                <div class="history-controls">
+                    <button onclick="showHistory(10)" class="history-btn">Last 10</button>
+                    <button onclick="showHistory(30)" class="history-btn">Last 30</button>
+                    <button onclick="showHistory(50)" class="history-btn">Last 50</button>
+                    <button onclick="showHistory(100)" class="history-btn">Last 100</button>
+                    <button onclick="clearHistory()" class="clear-btn">Clear Registry</button>
+                </div>
+                <div id="history-display" class="history-display"></div>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <h3>About This Mystical Predictor ⚓</h3>
+            <p>This here fortune-telling contraption be trained on the legendary Titanic dataset using the dark arts of logistic regression. 
+            It considers such maritime factors as yer cabin class, whether ye be a landlubber or a fair maiden, yer age, 
+            the size of yer crew (family aboard), the doubloons ye paid for passage, and which port ye embarked from 
+            to divine yer chances of surviving the icy depths. The model achieved approximately 80% accuracy - 
+            better than any ship's oracle, matey! ⚔️</p>
+            
+            <p><strong>🌍 Global Ship Registry:</strong> The passenger fate records above show predictions from <em>all sailors</em> 
+            who have tested their luck on this cursed vessel, from every corner of the seven seas! 
+            Watch as new souls join the registry in real-time through the magic of Firebase. 
+            Yer prediction will be immortalized for all to see - may the winds be ever in yer favor! 🏴‍☠️</p>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // 🔥 FIREBASE CONFIGURATION SECTION 🔥
+        // REPLACE THE VALUES BELOW WITH YOUR ACTUAL FIREBASE CONFIG
+        // Get these values from: Firebase Console → Project Settings → General → Your apps
+        // ========================================
+        
+       
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+        apiKey: "AIzaSyBGMQc3LypAjPohgm7AGub0Yoo8JpnNzkc",
+        authDomain: "titanic-predictor.firebaseapp.com",
+        projectId: "titanic-predictor",
+        storageBucket: "titanic-predictor.firebasestorage.app",
+        messagingSenderId: "684655970827",
+        appId: "1:684655970827:web:5409a83f4699209ee4950e"
+        };
+
+        // ========================================
+        // END FIREBASE CONFIG - DON'T EDIT BELOW THIS LINE
+        // ========================================
+
+        // Initialize Firebase
+        let database;
+        try {
+            if (typeof firebase !== 'undefined') {
+                firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                console.log('✅ Firebase initialized successfully!');
+            } else {
+                console.warn('⚠️ Firebase SDK not loaded - using local storage only');
+            }
+        } catch (error) {
+            console.error('❌ Firebase initialization failed:', error);
+            console.log('🔄 Falling back to local storage mode');
+        }
+
+        // Your actual trained model parameters
+        const modelParams = {
+            coefficients: [0.7285930566234607, -0.7718929504465151, -0.02655265752759915, -0.37145513225836235, -0.12646440724652747, 0.004950231247587483, -0.07803065397793812, -1.5317599002431137, 0.0026632825164398886, -2.161363375831815, 0.1920992497101696, -0.07803065397793812, 0.2870690328188207],
+            intercept: 2.446005399397039,
+            features: ["pclass", "sex", "age", "sibsp", "parch", "fare", "embarked", "class", "who", "adult_male", "deck", "embark_town", "alone"]
+        };
+
+        function sigmoid(z) {
+            return 1 / (1 + Math.exp(-z));
+        }
+
+        function predict(features) {
+            let z = modelParams.intercept;
+            for (let i = 0; i < features.length; i++) {
+                z += modelParams.coefficients[i] * features[i];
+            }
+            return sigmoid(z);
+        }
+
+        function preprocessInput(formData) {
+            // Convert form data to feature vector matching your exact model encodings
+            const pclass = parseInt(formData.pclass);
+            const sex = formData.sex === 'male' ? 1 : 0;  // 0=female, 1=male
+            const age = parseFloat(formData.age);
+            const sibsp = parseInt(formData.sibsp);
+            const parch = parseInt(formData.parch);
+            const fare = parseFloat(formData.fare);
+            
+            // Embarked encoding: {0: 'C', 1: 'Q', 2: 'S'}
+            let embarked = 0;  // Default C
+            if (formData.embarked === 'Q') embarked = 1;
+            else if (formData.embarked === 'S') embarked = 2;
+            
+            // Class encoding: {0: 'First', 1: 'Second', 2: 'Third'}
+            const classFeature = pclass - 1;  // Convert 1,2,3 to 0,1,2
+            
+            // Who encoding: {0: 'child', 1: 'man', 2: 'woman'}
+            let who = 0;  // Default child
+            if (age >= 16) {
+                who = sex === 1 ? 1 : 2;  // man=1, woman=2
+            }
+            
+            // Adult male: 1 if male and age >= 18
+            const adult_male = (sex === 1 && age >= 18) ? 1 : 0;
+            
+            // Deck encoding: {0: 'A', 1: 'B', 2: 'C', 3: 'D', 4: 'E', 5: 'F', 6: 'G'}
+            let deck = 0;  // Default A if unknown
+            if (formData.deck) {
+                const deckMap = {'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5, 'G': 6};
+                deck = deckMap[formData.deck] || 0;
+            }
+            
+            // Embark_town: same as embarked {0: 'Cherbourg', 1: 'Queenstown', 2: 'Southampton'}
+            const embark_town = embarked;
+            
+            // Alone: 1 if no family aboard, 0 otherwise
+            const alone = (sibsp + parch === 0) ? 1 : 0;
+            
+            return [pclass, sex, age, sibsp, parch, fare, embarked, classFeature, who, adult_male, deck, embark_town, alone];
+        }
+
+        // Global shared history with Firebase
+        async function savePrediction(name, formData, probability, survived) {
+            const prediction = {
+                name: name,
+                timestamp: new Date().toISOString(),
+                details: {
+                    class: formData.pclass,
+                    sex: formData.sex,
+                    age: formData.age,
+                    embarked: formData.embarked,
+                    deck: formData.deck || 'Unknown'
+                },
+                probability: probability,
+                survived: survived,
+                location: await getUserLocation()
+            };
+            
+            if (database) {
+                try {
+                    // Push to Firebase (auto-generates unique ID)
+                    await database.ref('predictions').push(prediction);
+                    showSuccessMessage('⚓ Prediction logged in the global ship registry!');
+                } catch (error) {
+                    console.error('Firebase save error:', error);
+                    saveToLocalStorage(prediction);
+                    showSuccessMessage('⚓ Saved locally (Firebase connection issue)');
+                }
+            } else {
+                // Fallback to local storage if Firebase isn't available
+                saveToLocalStorage(prediction);
+                showSuccessMessage('⚓ Saved locally (Firebase not configured)');
+            }
+        }
+
+        async function fetchGlobalHistory() {
+            if (!database) {
+                console.warn('Firebase not available, using local storage');
+                return JSON.parse(localStorage.getItem('titanicHistory') || '[]');
+            }
+            
+            try {
+                const snapshot = await database.ref('predictions')
+                    .orderByChild('timestamp')
+                    .limitToLast(1000)
+                    .once('value');
+                
+                const data = snapshot.val();
+                if (!data) return [];
+                
+                // Convert Firebase object to array and sort by timestamp (newest first)
+                return Object.values(data).sort((a, b) => 
+                    new Date(b.timestamp) - new Date(a.timestamp)
+                );
+            } catch (error) {
+                console.error('Error fetching from Firebase:', error);
+                return JSON.parse(localStorage.getItem('titanicHistory') || '[]');
+            }
+        }
+
+        function saveToLocalStorage(prediction) {
+            let history = JSON.parse(localStorage.getItem('titanicHistory') || '[]');
+            history.unshift(prediction);
+            history = history.slice(0, 100);
+            localStorage.setItem('titanicHistory', JSON.stringify(history));
+        }
+
+        async function getUserLocation() {
+            try {
+                const response = await fetch('https://ipapi.co/json/');
+                const data = await response.json();
+                return `${data.city}, ${data.country_name}`;
+            } catch {
+                return 'Unknown Location';
+            }
+        }
+
+        async function showHistory(count) {
+            const historyDisplay = document.getElementById('history-display');
+            historyDisplay.innerHTML = '<div class="loading">🌊 Loading from the global ship registry... 🌊</div>';
+            
+            try {
+                const history = await fetchGlobalHistory();
+                const displayHistory = history.slice(0, count);
+                
+                if (displayHistory.length === 0) {
+                    const isFirebase = database ? 'global' : 'local';
+                    historyDisplay.innerHTML = `<div class="history-empty">No records found in the ${isFirebase} logbook, matey! Be the first to test yer fate! 📜</div>`;
+                    return;
+                }
+                
+                const headerText = database ? 
+                    `🌍 Global Ship Registry (Showing ${displayHistory.length} records) 🌍` :
+                    `📱 Local Records Only (Showing ${displayHistory.length} total) 📱`;
+                
+                let html = `<div class="history-header">${headerText}</div>`;
+                
+                displayHistory.forEach((prediction, index) => {
+                    const date = new Date(prediction.timestamp).toLocaleString();
+                    const resultClass = prediction.survived ? 'survived' : 'not-survived';
+                    const resultText = prediction.survived ? '🎉 SURVIVED' : '💀 PERISHED';
+                    const timeAgo = getTimeAgo(prediction.timestamp);
+                    
+                    html += `
+                        <div class="history-item ${resultClass}">
+                            <div>
+                                <div class="history-name">${prediction.name}</div>
+                                <div class="history-details">
+                                    ${prediction.details.sex}, Age ${prediction.details.age}, Class ${prediction.details.class}
+                                    ${prediction.details.deck !== 'Unknown' ? ', Deck ' + prediction.details.deck : ''}
+                                    <br>
+                                    📍 ${prediction.location || 'Unknown'} • ${timeAgo}
+                                </div>
+                            </div>
+                            <div class="history-result ${resultClass}">
+                                ${resultText}<br>
+                                <small>${(prediction.probability * 100).toFixed(1)}%</small>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                historyDisplay.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading history:', error);
+                historyDisplay.innerHTML = '<div class="history-empty">⚠️ Trouble loading the ship\'s log, captain! ⚠️</div>';
+            }
+        }
+
+        async function clearHistory() {
+            const isGlobal = database ? true : false;
+            const warningText = isGlobal ? 
+                '🏴‍☠️ WARNING: This will clear the GLOBAL ship registry for ALL users! Are ye sure, captain?' :
+                '🏴‍☠️ Clear all local records from yer ship\'s log? This cannot be undone!';
+                
+            if (confirm(warningText)) {
+                if (database && isGlobal) {
+                    try {
+                        await database.ref('predictions').remove();
+                        document.getElementById('history-display').innerHTML = '<div class="history-empty">The global logbook has been cleared by the captain! 📜</div>';
+                        showSuccessMessage('🌊 Global registry cleared!');
+                    } catch (error) {
+                        console.error('Error clearing Firebase:', error);
+                        alert('⚠️ Failed to clear global registry. Network issue, matey!');
+                    }
+                } else {
+                    localStorage.removeItem('titanicHistory');
+                    document.getElementById('history-display').innerHTML = '<div class="history-empty">The local logbook has been cleared, captain! 📜</div>';
+                    showSuccessMessage('🌊 Local registry cleared!');
+                }
+            }
+        }
+
+        function getTimeAgo(timestamp) {
+            try {
+                const now = new Date();
+                const past = new Date(timestamp);
+                const diffMs = now - past;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+                
+                if (diffMins < 1) return 'Just now';
+                if (diffMins < 60) return `${diffMins}m ago`;
+                if (diffHours < 24) return `${diffHours}h ago`;
+                return `${diffDays}d ago`;
+            } catch (error) {
+                console.error('Error calculating time ago:', error);
+                return 'Recently';
+            }
+        }
+
+        function showSuccessMessage(message) {
+            const msg = document.createElement('div');
+            msg.style.cssText = `
+                position: fixed; top: 20px; right: 20px; z-index: 1000;
+                background: linear-gradient(45deg, #228B22, #32CD32);
+                color: white; padding: 15px 20px; border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                font-weight: bold; animation: slideIn 0.3s ease;
+            `;
+            msg.textContent = message;
+            document.body.appendChild(msg);
+            
+            setTimeout(() => {
+                msg.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => msg.remove(), 300);
+            }, 3000);
+        }
+
+        // Test function to verify model is working
+        function testModel() {
+            console.log('🧪 Testing model with sample data...');
+            try {
+                const testFeatures = [3, 1, 25, 0, 0, 7.25, 2, 2, 1, 1, 0, 2, 1]; // Sample male, 3rd class
+                console.log('Test features:', testFeatures);
+                console.log('Expected features length:', modelParams.features.length);
+                console.log('Actual features length:', testFeatures.length);
+                
+                if (testFeatures.length !== modelParams.features.length) {
+                    console.error('❌ Feature length mismatch!');
+                    return;
+                }
+                
+                const testProbability = predict(testFeatures);
+                console.log('✅ Test prediction probability:', testProbability);
+                console.log('✅ Test prediction result:', testProbability > 0.5 ? 'SURVIVED' : 'PERISHED');
+                
+                if (isNaN(testProbability)) {
+                    console.error('❌ Model returned NaN - check model parameters!');
+                }
+            } catch (error) {
+                console.error('❌ Model test failed:', error);
+            }
+        }
+
+        // Debug function to check all components
+        function debugSystem() {
+            console.log('🔍 System Debug Report:');
+            console.log('- Model params loaded:', !!modelParams);
+            console.log('- Coefficients count:', modelParams?.coefficients?.length);
+            console.log('- Features count:', modelParams?.features?.length);
+            console.log('- Firebase loaded:', typeof firebase !== 'undefined');
+            console.log('- Database initialized:', !!database);
+            console.log('- Prediction form found:', !!document.getElementById('predictionForm'));
+            console.log('- Result div found:', !!document.getElementById('result'));
+            console.log('- History display found:', !!document.getElementById('history-display'));
+        }
+
+        // Load global history on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Page loaded, initializing...');
+            
+            // Run system debug
+            debugSystem();
+            
+            // Test the model
+            testModel();
+            
+            // Load history
+            showHistory(10); // Show last 10 by default
+            
+            console.log('✅ Initialization complete!');
+        });
+
+        document.getElementById('predictionForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            console.log('Form submitted!'); // Debug log
+            
+            const formData = {
+                name: document.getElementById('name').value,
+                pclass: document.getElementById('pclass').value,
+                sex: document.getElementById('sex').value,
+                age: document.getElementById('age').value,
+                sibsp: document.getElementById('sibsp').value,
+                parch: document.getElementById('parch').value,
+                fare: document.getElementById('fare').value,
+                embarked: document.getElementById('embarked').value,
+                deck: document.getElementById('deck').value
+            };
+            
+            console.log('Form data:', formData); // Debug log
+            
+            const features = preprocessInput(formData);
+            console.log('Feature vector:', features);
+            console.log('Feature names:', modelParams.features);
+            console.log('Model coefficients:', modelParams.coefficients);
+            
+            const probability = predict(features);
+            console.log('Calculated probability:', probability); // Debug log
+            
+            const survived = probability > 0.5;
+            
+            const resultDiv = document.getElementById('result');
+            const predictionText = document.getElementById('prediction-text');
+            const probabilityText = document.getElementById('probability-text');
+            
+            if (survived) {
+                resultDiv.className = 'result survived';
+                predictionText.textContent = `🎉 Avast ${formData.name}! Ye would have SURVIVED the watery grave, ye lucky sea dog!`;
+            } else {
+                resultDiv.className = 'result not-survived';
+                predictionText.textContent = `💀 Arrr ${formData.name}! Ye would have met Davy Jones' locker, ye unfortunate soul!`;
+            }
+            
+            probabilityText.textContent = `Survival Probability: ${(probability * 100).toFixed(1)}% (The seas have spoken!) ⚓`;
+            resultDiv.style.display = 'block';
+            
+            console.log('About to save prediction...'); // Debug log
+            
+            // Save to global Firebase registry
+            await savePrediction(formData.name, formData, probability, survived);
+            
+            // Update history display to show the new prediction
+            await showHistory(10);
+            
+            console.log('Prediction process completed!'); // Debug log
+        });
+    </script>
+</body>
+</html>
