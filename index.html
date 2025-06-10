@@ -516,23 +516,33 @@
         }
 
         // Your actual trained model parameters
-        const modelParams = {
-            coefficients: [0.7285930566234607, -0.7718929504465151, -0.02655265752759915, -0.37145513225836235, -0.12646440724652747, 0.004950231247587483, -0.07803065397793812, -1.5317599002431137, 0.0026632825164398886, -2.161363375831815, 0.1920992497101696, -0.07803065397793812, 0.2870690328188207],
-            intercept: 2.446005399397039,
-            features: ["pclass", "sex", "age", "sibsp", "parch", "fare", "embarked", "class", "who", "adult_male", "deck", "embark_town", "alone"]
-        };
+        const modelParams = {"coefficients": [-0.3350694099837518, -0.042198192672217964, -0.16649418550115574, -0.6304203114634068, -0.2985833463881749, 0.12524573349182083, 0.05585277125536062, -0.3350694099837518, 0.021777641576944264, -1.4580361046135355, -0.14299225865909737, -0.19549332147270648, -0.24843757197835495], "intercept": -0.662228515279198, "features": ["pclass", "sex", "age", "sibsp", "parch", "fare", "embarked", "class", "who", "adult_male", "deck", "embark_town", "alone"]};
 
         function sigmoid(z) {
             return 1 / (1 + Math.exp(-z));
         }
+        const scalerParams = {
+    means: [2.308641975308642, 0.6475869809203143, 29.11242424242424, 0.5230078563411896, 0.38159371492704824, 32.204207968574636, 1.5364758698092031, 1.308641975308642, 1.2109988776655443, 0.6026936026936027, 5.945005611672278, 1.5297418630751964, 0.6026936026936027],
+    scales: [0.8356019334795166, 0.47772176322921145, 13.2969559718967, 1.1021244350892878, 0.8056047612452208, 49.6655344447741, 0.7910587133873435, 0.8356019334795166, 0.5939578023145061, 0.4893403968259809, 2.0603425763583685, 0.7998048587956982, 0.4893403968259809]
 
-        function predict(features) {
-            let z = modelParams.intercept;
-            for (let i = 0; i < features.length; i++) {
-                z += modelParams.coefficients[i] * features[i];
-            }
-            return sigmoid(z);
-        }
+};
+
+function scaleFeatures(features) {
+    return features.map((feature, i) => 
+        (feature - scalerParams.means[i]) / scalerParams.scales[i]
+    );
+}
+
+function predict(features) {
+    // Scale features first!
+    const scaledFeatures = scaleFeatures(features);
+    
+    let z = modelParams.intercept;
+    for (let i = 0; i < scaledFeatures.length; i++) {
+        z += modelParams.coefficients[i] * scaledFeatures[i];
+    }
+    return sigmoid(z);
+}
 
         function preprocessInput(formData) {
             // Convert form data to feature vector matching your exact model encodings
